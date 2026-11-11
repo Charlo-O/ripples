@@ -2,7 +2,9 @@
 
 一张可以写字的水面纸笺。输入文字时泛起涟漪，支持六种纸色、印章和音效。
 
-在线使用：<https://charlo-o.github.io/ripples/>
+在线使用：<https://charlo.cn/ripples/>
+
+GitHub Pages 入口：<https://charlo-o.github.io/ripples/>（继承账号已有的 `charlo.cn` 域名，会跳转到该域名）。
 
 ## 本地运行
 
