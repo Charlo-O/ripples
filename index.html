@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>纸上涟漪</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<style>
+  /* 汇文明朝体 — the authentic text face, shipped beside this page. */
+  @font-face {
+    font-family: "Huiwen Mincho";
+    src: local("Huiwen-mincho"), local("汇文明朝体"), local("HuiwenMincho"),
+         url("fonts/HuiwenMincho.ttf") format("truetype");
+    font-display: swap;
+  }
+
+  :root {
+    color-scheme: light;
+    box-sizing: border-box;
+    --paper: #eceee8;      /* 宣纸 */
+    --fiber: #d3d6cc;
+    --ink: #1f2429;        /* 松烟墨 */
+    --ink-soft: #5f6763;
+    --seal: #b03a2c;       /* 朱砂 */
+    --on-seal: #f6f2ea;
+    --font-text: "Huiwen Mincho", "Noto Serif SC", "Songti SC", "STSong", serif;
+    --font-brush: "Ma Shan Zheng", "Huiwen Mincho", "STKaiti", "KaiTi", serif;
+    --title-col: clamp(52px, 3vw + 34px, 84px);
+  }
+  *, *::before, *::after { box-sizing: inherit; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; overflow: hidden;
+    background: var(--paper); color: var(--ink);
+    font: 14px var(--font-text);
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* The water: one sheet of paper that behaves like still water. */
+  #water { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: manipulation; }
+  .no-gl #water { display: none; }
+
+  /* The writing surface floats above the canvas; the script traces its glyphs into the water. */
+  #sheet {
+    position: fixed; inset: 0; z-index: 1; margin: 0;
+    overflow-y: auto; overscroll-behavior: contain;
+    padding-block: calc(env(safe-area-inset-top, 0px) + clamp(56px, 15vh, 160px)) calc(env(safe-area-inset-bottom, 0px) + 128px);
+    padding-left: max(max(16px, env(safe-area-inset-left, 0px)), calc((100% - 24em) / 2));
+    padding-right: max(calc(max(16px, env(safe-area-inset-right, 0px)) + var(--title-col) + 12px), calc((100% - 24em) / 2));
+    font: 400 clamp(19px, 0.9vw + 15px, 26px)/2 var(--font-text);
+    letter-spacing: 0.08em;
+    color: var(--ink); caret-color: var(--seal);
+    white-space: pre-wrap; overflow-wrap: anywhere;
+    outline: none; background: transparent; scrollbar-width: none;
+  }
+  #sheet::-webkit-scrollbar { display: none; }
+  #sheet::selection { background: color-mix(in srgb, var(--seal) 22%, transparent); }
+  /* When WebGL draws the ink, the live DOM text is hidden but still editable/selectable. */
+  #sheet.traced { color: transparent; }
+  #sheet.traced::selection { color: transparent; }
+
+  /* Title and seal, standing in the right margin. */
+  .mark {
+    position: fixed; z-index: 2;
+    top: calc(env(safe-area-inset-top, 0px) + clamp(40px, 9vh, 112px));
+    right: max(16px, env(safe-area-inset-right, 0px));
+    width: var(--title-col);
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+    pointer-events: none;
+  }
+  .mark h1 {
+    margin: 0; writing-mode: vertical-rl;
+    font: 400 clamp(26px, 1.4vw + 18px, 38px)/1 var(--font-brush);
+    letter-spacing: 0.2em; color: var(--ink);
+  }
+  .seal {
+    writing-mode: vertical-rl; pointer-events: auto; cursor: pointer;
+    font: 600 12px/1 var(--font-text); letter-spacing: 0.12em;
+    background: var(--seal); color: var(--on-seal);
+    padding: 6px 4px 5px; border-radius: 2px;
+    transform: translateX(-6px) rotate(-1.5deg);
+    filter: url(#stamp); user-select: none;
+    transition: transform .12s ease;
+  }
+  .seal:active { transform: translateX(-6px) rotate(-1.5deg) scale(.94); }
+
+  /* Footer: count · paper picker · sound · new sheet. */
+  .bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 2;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 30px calc(env(safe-area-inset-bottom, 0px) + 16px);
+    font: 400 13px/1.6 var(--font-text); letter-spacing: 0.06em; color: var(--ink-soft);
+    background: linear-gradient(to top, var(--paper) 46%, color-mix(in srgb, var(--paper) 0%, transparent));
+    pointer-events: none;
+  }
+  .bar > * { pointer-events: auto; }
+  .bar .grow { flex: 1 1 0; min-width: 0; }
+  #count { font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
+
+  .papers { display: inline-flex; align-items: center; gap: 8px; }
+  .papers .label { color: var(--ink-soft); }
+  #paperName { color: var(--ink); min-width: 3.4em; }
+  .chip {
+    width: 22px; height: 22px; padding: 0; cursor: pointer;
+    border-radius: 5px; border: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
+    background: var(--sw); position: relative;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);
+    transition: transform .12s ease, box-shadow .12s ease;
+  }
+  .chip:hover { transform: translateY(-2px); }
+  .chip[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--seal); border-color: var(--seal); }
+  .chip:focus-visible { outline: 2px solid var(--seal); outline-offset: 2px; }
+
+  .btn {
+    font: inherit; letter-spacing: inherit; color: var(--ink);
+    background: none; border: 0; padding: 2px 0; cursor: pointer;
+    border-bottom: 1px solid color-mix(in srgb, var(--ink) 40%, transparent);
+  }
+  .btn:hover { border-bottom-color: var(--seal); color: var(--seal); }
+  .btn:focus-visible { outline: 2px solid var(--seal); outline-offset: 3px; border-radius: 2px; }
+  #sound { display: inline-flex; align-items: center; gap: 6px; border-bottom: 0; }
+  #sound .dot { width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid var(--ink-soft); }
+  #sound.on .dot { background: var(--seal); border-color: var(--seal); }
+  #sound.on { color: var(--ink); }
+
+  @media (max-width: 640px) {
+    .papers .label, #paperName { display: none; }
+    .bar { gap: 8px 14px; }
+  }
+</style>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&text=%E7%BA%B8%E4%B8%8A%E6%B6%9F%E6%BC%AA&display=swap">
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <filter id="stamp"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="7"/><feDisplacementMap in="SourceGraphic" scale="1.8"/></filter>
+</svg>
+
+<canvas id="water"></canvas>
+<div id="sheet" contenteditable="plaintext-only" spellcheck="false" autocapitalize="off" autocorrect="off"
+     aria-label="纸面，可以在这里写字" aria-multiline="true">半亩方塘一鉴开，
+天光云影共徘徊。
+问渠那得清如许？
+为有源头活水来。
+
+—— 朱熹《观书有感》</div>
+
+<header class="mark">
+  <h1>纸上涟漪</h1>
+  <div class="seal" id="seal" role="button" tabindex="0" aria-label="盖章">活水</div>
+</header>
+
+<footer class="bar">
+  <span id="count">点一下纸面，开始写字</span>
+  <span class="grow"></span>
+  <div class="papers" id="papers" role="group" aria-label="背景纸">
+    <span class="label">背景纸</span>
+    <span id="paperName"></span>
+  </div>
+  <button id="sound" class="btn" type="button" aria-pressed="true"><span class="dot"></span><span id="soundText">音效</span></button>
+  <button id="fresh" class="btn" type="button">换一张纸</button>
+</footer>
+
+<script src="sfx.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
