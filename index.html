@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh">
+<html lang="zh" class="intro-wait">
 <head>
 <meta charset="utf8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -26,6 +26,9 @@
     --font-text: "Huiwen Mincho", "Noto Serif SC", "Songti SC", "STSong", serif;
     --font-brush: "Ma Shan Zheng", "Huiwen Mincho", "STKaiti", "KaiTi", serif;
     --title-col: clamp(52px, 3vw + 34px, 84px);
+    /* Motion: water settling, never bouncing — except the seal, which lands once. */
+    --ease: cubic-bezier(.2,.7,.2,1);
+    --ease-land: cubic-bezier(.3,.7,.3,1);
   }
   *, *::before, *::after { box-sizing: inherit; }
   html, body { height: 100%; }
@@ -36,6 +39,7 @@
     padding-top: env(safe-area-inset-top, 0px);
     padding-bottom: env(safe-area-inset-bottom, 0px);
     -webkit-tap-highlight-color: transparent;
+    transition: background-color .3s var(--ease), color .3s var(--ease);
   }
 
   /* The water: one sheet of paper that behaves like still water. */
@@ -49,13 +53,26 @@
     padding-block: calc(env(safe-area-inset-top, 0px) + clamp(56px, 15vh, 160px)) calc(env(safe-area-inset-bottom, 0px) + 128px);
     padding-left: max(max(16px, env(safe-area-inset-left, 0px)), calc((100% - 24em) / 2));
     padding-right: max(calc(max(16px, env(safe-area-inset-right, 0px)) + var(--title-col) + 12px), calc((100% - 24em) / 2));
-    font: 400 clamp(19px, 0.9vw + 15px, 26px)/2 var(--font-text);
+    --fs: clamp(19px, 0.9vw + 15px, 26px);
+    font: 400 var(--fs)/2 var(--font-text);
     letter-spacing: 0.08em;
     color: var(--ink); caret-color: var(--seal);
     white-space: pre-wrap; overflow-wrap: anywhere;
     outline: none; background: transparent; scrollbar-width: none;
   }
   #sheet::-webkit-scrollbar { display: none; }
+  /* On bamboo slips the writing runs down the slips, one column to a slip, right to left,
+     between the two cords. */
+  .vertical #sheet {
+    writing-mode: vertical-rl;
+    overflow-x: auto; overflow-y: hidden;
+    line-height: calc(var(--fs) * 1.7);
+    letter-spacing: 0.14em;
+    padding: calc(env(safe-area-inset-top, 0px) + 10vh + 20px)
+             calc(max(16px, env(safe-area-inset-right, 0px)) + var(--title-col) + 12px)
+             calc(env(safe-area-inset-bottom, 0px) + 12vh + 20px)
+             max(16px, env(safe-area-inset-left, 0px));
+  }
   #sheet::selection { background: color-mix(in srgb, var(--seal) 22%, transparent); }
   /* When WebGL draws the ink, the live DOM text is hidden but still editable/selectable. */
   #sheet.traced { color: transparent; }
@@ -69,6 +86,7 @@
     width: var(--title-col);
     display: flex; flex-direction: column; align-items: center; gap: 14px;
     pointer-events: none;
+    transition: opacity .6s var(--ease);
   }
   .mark h1 {
     margin: 0; writing-mode: vertical-rl;
@@ -76,15 +94,40 @@
     letter-spacing: 0.2em; color: var(--ink);
   }
   .seal {
-    writing-mode: vertical-rl; pointer-events: auto; cursor: pointer;
+    writing-mode: vertical-rl; pointer-events: auto; cursor: grab; touch-action: none;
     font: 600 12px/1 var(--font-text); letter-spacing: 0.12em;
     background: var(--seal); color: var(--on-seal);
     padding: 6px 4px 5px; border-radius: 2px;
     transform: translateX(-6px) rotate(-1.5deg);
     filter: url(#stamp); user-select: none;
-    transition: transform .12s ease;
+    transition: transform .2s var(--ease), opacity .25s var(--ease);
   }
-  .seal:active { transform: translateX(-6px) rotate(-1.5deg) scale(.94); }
+  .seal:hover { transform: translateX(-6px) translateY(-1px) rotate(-2deg); }
+  .seal:focus-visible { outline: 2px solid var(--seal); outline-offset: 3px; }
+  /* Press: lift, come down, one small give, rest. */
+  .seal.press { animation: press .36s var(--ease-land); }
+  .seal.lifted { opacity: .35; }
+  @keyframes press {
+    0%   { transform: translateX(-6px) rotate(-1.5deg); }
+    35%  { transform: translateX(-6px) translateY(-5px) rotate(-3deg) scale(1.1); box-shadow: 3px 9px 10px rgba(0,0,0,.2); }
+    58%  { transform: translateX(-6px) rotate(-1.5deg) scale(.9); box-shadow: 0 0 0 rgba(0,0,0,0); }
+    78%  { transform: translateX(-6px) rotate(-1.5deg) scale(1.04); }
+    100% { transform: translateX(-6px) rotate(-1.5deg); }
+  }
+  /* The seal carried over the paper, then set down. */
+  .seal-ghost {
+    position: fixed; left: 0; top: 0; z-index: 5; margin: 0;
+    pointer-events: none; transition: none; cursor: grabbing;
+    transform: translate(var(--gx), var(--gy)) translate(-50%, -50%) rotate(var(--gr)) scale(1.14);
+    box-shadow: 5px 12px 16px rgba(0,0,0,.24);
+  }
+  .seal-ghost.land { animation: land .3s var(--ease-land) forwards; }
+  .seal-ghost.away { animation: away .24s var(--ease) forwards; }
+  @keyframes land {
+    55%  { transform: translate(var(--gx), var(--gy)) translate(-50%, -50%) rotate(var(--gr)) scale(.94); box-shadow: 0 0 0 rgba(0,0,0,0); opacity: 1; }
+    100% { transform: translate(var(--gx), var(--gy)) translate(-50%, -50%) rotate(var(--gr)) scale(1); box-shadow: 0 0 0 rgba(0,0,0,0); opacity: 0; }
+  }
+  @keyframes away { to { transform: translate(var(--gx), var(--gy)) translate(-50%, -50%) rotate(var(--gr)) scale(.7); opacity: 0; } }
 
   /* Footer: count · paper picker · sound · new sheet. */
   .bar {
@@ -94,38 +137,104 @@
     padding-right: max(16px, env(safe-area-inset-right, 0px));
     padding-block: 30px calc(env(safe-area-inset-bottom, 0px) + 16px);
     font: 400 13px/1.6 var(--font-text); letter-spacing: 0.06em; color: var(--ink-soft);
-    background: linear-gradient(to top, var(--paper) 46%, color-mix(in srgb, var(--paper) 0%, transparent));
     pointer-events: none;
+    transition: opacity .6s var(--ease);
+  }
+  .bar::before {
+    content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    background: linear-gradient(to top, var(--paper) 46%, color-mix(in srgb, var(--paper) 0%, transparent));
+    transition: opacity .35s var(--ease);
   }
   .bar > * { pointer-events: auto; }
   .bar .grow { flex: 1 1 0; min-width: 0; }
+
+  /* While writing, the margins step back; moving the pointer brings them forward. */
+  .writing .mark, .writing .bar { opacity: .35; }
+  /* While the paper is out of the water, there is nothing to stand on: the footer's ground
+     goes, and the title steps aside while a sheet passes over it, coming back once it has. */
+  .lifting .bar::before { opacity: 0; }
+  .mark.under { opacity: 0; transition-duration: .16s; }
+  /* A new sheet is on its way: the caret waits for it to arrive. */
+  .laying #sheet { caret-color: transparent; }
+
   #count { font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
+  #count.swap { animation: rise .32s var(--ease); }
+  #count .num { display: inline-block; }
+  #count .num.up { animation: rollUp .28s var(--ease); }
+  #count .num.down { animation: rollDown .28s var(--ease); }
+  @keyframes rollUp { from { transform: translateY(.5em); opacity: 0; } }
+  @keyframes rollDown { from { transform: translateY(-.5em); opacity: 0; } }
+  @keyframes rise { from { transform: translateY(4px); opacity: 0; } }
 
   .papers { display: inline-flex; align-items: center; gap: 8px; }
   .papers .label { color: var(--ink-soft); }
-  #paperName { color: var(--ink); min-width: 3.4em; }
+  #paperName { color: var(--ink); min-width: 3.4em; transition: opacity .12s var(--ease), color .2s var(--ease); }
+  #paperName.preview { color: var(--ink-soft); }
   .chip {
     width: 22px; height: 22px; padding: 0; cursor: pointer;
     border-radius: 5px; border: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
     background: var(--sw); position: relative;
     box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);
-    transition: transform .12s ease, box-shadow .12s ease;
+    transition: transform .2s var(--ease), border-color .3s var(--ease);
   }
   .chip:hover { transform: translateY(-2px); }
-  .chip[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--seal); border-color: var(--seal); }
-  .chip:focus-visible { outline: 2px solid var(--seal); outline-offset: 2px; }
+  /* The chosen paper: a cinnabar ring that spreads out from the swatch. */
+  .chip::after {
+    content: ""; position: absolute; inset: -4px; border-radius: 7px; pointer-events: none;
+    border: 1.5px solid var(--seal); opacity: 0; transform: scale(.6);
+    transition: opacity .3s var(--ease), transform .42s var(--ease);
+  }
+  .chip[aria-pressed="true"] { border-color: var(--seal); }
+  .chip[aria-pressed="true"]::after { opacity: 1; transform: scale(1); }
+  .chip:focus-visible { outline: 2px solid var(--seal); outline-offset: 5px; }
 
+  /* Underlines are drawn like a brush stroke, left to right. */
   .btn {
     font: inherit; letter-spacing: inherit; color: var(--ink);
-    background: none; border: 0; padding: 2px 0; cursor: pointer;
-    border-bottom: 1px solid color-mix(in srgb, var(--ink) 40%, transparent);
+    border: 0; padding: 2px 0 3px; cursor: pointer;
+    background:
+      linear-gradient(var(--seal), var(--seal)) left bottom / 0% 1px no-repeat,
+      linear-gradient(color-mix(in srgb, var(--ink) 40%, transparent), color-mix(in srgb, var(--ink) 40%, transparent)) left bottom / 100% 1px no-repeat;
+    transition: background-size .38s var(--ease), color .2s var(--ease);
   }
-  .btn:hover { border-bottom-color: var(--seal); color: var(--seal); }
+  .btn:hover { background-size: 100% 1px, 100% 1px; color: var(--seal); }
   .btn:focus-visible { outline: 2px solid var(--seal); outline-offset: 3px; border-radius: 2px; }
-  #sound { display: inline-flex; align-items: center; gap: 6px; border-bottom: 0; }
-  #sound .dot { width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid var(--ink-soft); }
+  #sound { display: inline-flex; align-items: center; gap: 6px; background: none; }
+  #sound .dot {
+    position: relative; width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid var(--ink-soft);
+    transition: background-color .25s var(--ease), border-color .25s var(--ease);
+  }
   #sound.on .dot { background: var(--seal); border-color: var(--seal); }
   #sound.on { color: var(--ink); }
+  /* Sound on: two rings run out from the dot. */
+  #sound .dot::before, #sound .dot::after {
+    content: ""; position: absolute; inset: -1.5px; border-radius: 50%; pointer-events: none;
+    border: 1px solid var(--seal); opacity: 0;
+  }
+  #sound.ping .dot::before { animation: ping .9s var(--ease); }
+  #sound.ping .dot::after { animation: ping .9s .16s var(--ease) backwards; }
+  @keyframes ping { from { opacity: .85; transform: scale(1); } to { opacity: 0; transform: scale(3.6); } }
+
+  /* Opening: title brushed top to bottom, the poem settles (in WebGL), the seal lands last. */
+  .intro-wait .mark, .intro-wait .bar, .intro-wait.no-gl #sheet { opacity: 0; }
+  .intro .mark h1 { animation: write 1.3s .3s cubic-bezier(.5,.1,.3,1) both; }
+  .intro .seal { animation: sealIn .55s var(--seal-delay, 1.6s) var(--ease-land) both; }
+  .intro .bar { animation: rise .9s 1.2s var(--ease) both; }
+  .no-gl.intro #sheet { animation: rise 1.2s .2s var(--ease) both; }
+  @keyframes write { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 0 0); } }
+  @keyframes sealIn {
+    0%   { opacity: 0; transform: translateX(-6px) translateY(-8px) rotate(-5deg) scale(1.25); }
+    55%  { opacity: 1; transform: translateX(-6px) rotate(-1.5deg) scale(.9); }
+    100% { opacity: 1; transform: translateX(-6px) rotate(-1.5deg) scale(1); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .intro .mark h1, .intro .seal, .intro .bar, .no-gl.intro #sheet,
+    .seal.press, .seal-ghost.land, #sound.ping .dot::before, #sound.ping .dot::after,
+    #count.swap, #count .num.up, #count .num.down { animation: none !important; }
+    .chip:hover { transform: none; }
+    .seal:hover { transform: translateX(-6px) rotate(-1.5deg); }
+  }
 
   @media (max-width: 640px) {
     .papers .label, #paperName { display: none; }
@@ -152,7 +261,7 @@
 
 <header class="mark">
   <h1>纸上涟漪</h1>
-  <div class="seal" id="seal" role="button" tabindex="0" aria-label="盖章">活水</div>
+  <div class="seal" id="seal" role="button" tabindex="0" aria-label="盖章" title="点按盖章，拖到纸上落款">活水</div>
 </header>
 
 <footer class="bar">
